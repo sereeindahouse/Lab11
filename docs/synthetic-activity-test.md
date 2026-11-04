@@ -27,6 +27,7 @@ actual test run. Application files were not changed.
 | Entry | Synthetic author date | Author time and UTC offset |
 | --- | --- | --- |
 | 1 | 2026-11-02 | 12:00:00 +08:00 |
+| 2 | 2026-11-04 | 12:00:00 +08:00 |
 
 ## Interpreting the result
 

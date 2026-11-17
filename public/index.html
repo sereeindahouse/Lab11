@@ -301,7 +301,7 @@ function drawA(d) {
   const m = d.map, svg = $("gridA");
   const exp = new Set($("showExp").checked ? d.astar.expanded_order.map(s => s.join(",")) : []);
   baseGrid(svg, m, (x, y) => exp.has(x + "," + y) ? "#c9dfee" : "#f7f5ef");
-  polyline(svg, d.astar.path, "#d7301f", Math.max(.08, .3 - m.width / 120));
+  polyline(svg, d.astar.path, "#d7301f", Math.max(.08, .16 - m.width / 250));
   badge(svg, m.start, "S", "#2171b5"); badge(svg, m.goal, "G", "#238b45");
 }
 
@@ -319,7 +319,7 @@ function drawV(d) {
   }
   if (m.width <= 10)
     for (const [x, y, v] of d.vi.V) {
-      if (x === m.start[0] && y === m.start[1]) continue;
+      if ((x === m.start[0] && y === m.start[1]) || (x === m.goal[0] && y === m.goal[1])) continue;
       text(svg, x, y + .3, v.toFixed(1), { "font-size": .2, fill: norm(v) > .6 ? "#fff" : "#333" });
     }
   const k = +$("step").value, trail = d.episode.trail;

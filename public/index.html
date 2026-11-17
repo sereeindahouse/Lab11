@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Агуулахын робот — A* ба Value Iteration</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1f2328; --muted: #6b6f76; --line: #e3e1da;
+    --accent: #d7301f; --wall: #5b4636; --free: #f7f5ef; --exp: #9ecae1;
+    --path: #d7301f; --trail: #6a51a3; --robot: #ff7f00; --s: #2171b5; --g: #238b45;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         color: var(--ink); background: var(--bg); }
+  .layout { display: grid; grid-template-columns: 270px 1fr; min-height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); padding: 24px 20px; }
+  main { padding: 28px 36px 48px; min-width: 0; }
+  h1 { font-size: 26px; line-height: 1.25; margin: 0 0 4px; }
+  .caption { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 18px 0 6px; }
+  label:first-of-type { margin-top: 0; }
+  select, input[type=number] { width: 100%; padding: 7px 9px; font: inherit; border: 1px solid var(--line);
+         border-radius: 6px; background: #fff; color: var(--ink); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .val { float: right; color: var(--ink); font-weight: 600; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { flex: 1; padding: 6px 0; border: 0; background: #fff; font: inherit; cursor: pointer;
+         color: var(--ink); border-left: 1px solid var(--line); }
+  .seg button:first-child { border-left: 0; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 22px; line-height: 1.45; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .tabs button { background: none; border: 0; padding: 8px 14px; font: inherit; cursor: pointer;
+         color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .row { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 28px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  svg.grid { width: 100%; max-width: 600px; display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--panel); }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; }
+  th { text-align: left; background: #faf9f6; font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .note { font-size: 14px; color: #3b3f45; margin: 12px 0; }
+  .alert { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+  .alert.err { background: #fde8e6; color: #8a1c12; }
+  .alert.warn { background: #fff4d6; color: #7a5a00; }
+  .stepbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .stepbar input { flex: 1; }
+  .stepbar button { padding: 5px 12px; font: inherit; border: 1px solid var(--line); border-radius: 6px;
+         background: #fff; cursor: pointer; min-width: 84px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 5px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 10px; color: var(--ink); }
+  .loading { opacity: .45; transition: opacity .15s; pointer-events: none; }
+  .chart-title { font-size: 13px; color: var(--muted); margin: 16px 0 4px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    main { padding: 20px 16px 40px; }
+    .row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <label for="map">Зураглал</label>
+    <select id="map"></select>
+
+    <label>p — сонгосон чиглэлд явах магадлал</label>
+    <div class="seg" id="pseg"></div>
+
+    <label for="gamma">γ — ирээдүйн шагналын жин <span class="val" id="gammaVal"></span></label>
+    <input type="range" id="gamma" min="0.80" max="0.99" step="0.01" value="0.95">
+
+    <label for="seed">seed (санамсаргүй оролдлого)</label>
+    <input type="number" id="seed" value="42" min="0" max="1000000" step="1">
+
+    <p class="hint">
+      <b>S</b> — эхлэл, <b>G</b> — хүргэлтийн цэг, хүрэн — тавиур.<br>
+      Шагнал: G-д орох +50, бусад алхам −1.<br>
+      p = 0.8 үед робот 80% сонгосон чиглэлд, хажуу тус бүр 10%-д явна.
+    </p>
+  </aside>
+
+  <main>
+    <h1>Агуулахын хүргэлтийн робот — A* ба Value Iteration</h1>
+    <div class="caption" id="caption">Ачаалж байна…</div>
+
+    <div class="tabs">
+      <button data-tab="a" class="on">A* хайлт (p=1)</button>
+      <button data-tab="v">Value Iteration</button>
+    </div>
+
+    <div id="error" class="alert err" hidden></div>
+
+    <section id="tab-a">
+      <div class="row">
+        <div class="card">
+          <label class="check"><input type="checkbox" id="showExp" checked> Нээсэн оройг харуулах</label>
+          <svg class="grid" id="gridA"></svg>
+          <div class="legend">
+            <span><i style="background:var(--path)"></i>A* зам</span>
+            <span><i style="background:var(--exp)"></i>нээсэн орой</span>
+            <span><i style="background:var(--wall)"></i>тавиур</span>
+          </div>
+        </div>
+        <div>
+          <div id="noPathA" class="alert err" hidden>Зам олдсонгүй — зорилго хаалттай.</div>
+          <table>
+            <thead><tr><th>хэмжүүр</th><th>A*</th><th>BFS</th></tr></thead>
+            <tbody id="cmpBody"></tbody>
+          </table>
+          <p class="note">A* нь <b>f = g + h</b> хамгийн бага оройг түрүүлж нээнэ; h = Манхэттэн зай.
+            BFS-тэй өртөг нь тэнцүү байх ёстой, харин нээсэн оройн тоо цөөн байх нь эвристикийн ашиг.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-v" hidden>
+      <div class="row">
+        <div class="card">
+          <div id="noPathV" class="alert warn" hidden>Энэ зураглалд зорилго хүрэх боломжгүй.</div>
+          <div class="stepbar">
+            <button id="play">▶ Тоглуулах</button>
+            <input type="range" id="step" min="0" max="0" value="0">
+            <span id="stepVal" style="min-width:64px;text-align:right;font-variant-numeric:tabular-nums"></span>
+          </div>
+          <svg class="grid" id="gridV"></svg>
+          <div class="legend">
+            <span><i style="background:linear-gradient(90deg,#ffffe5,#78c679,#004529)"></i>V (их нь ногоон)</span>
+            <span>↑↓←→ үйлдэл сонголт π(s)</span>
+            <span><i style="background:var(--trail)"></i>роботын явсан зам</span>
+            <span><i style="background:var(--robot);border-radius:50%"></i>робот</span>
+          </div>
+        </div>
+        <div>
+          <div class="metrics">
+            <div class="metric"><div class="k">Давталт</div><div class="v" id="mIter"></div></div>
+            <div class="metric"><div class="k">V(S)</div><div class="v" id="mV"></div></div>
+            <div class="metric"><div class="k">Төлөвлөх (мс)</div><div class="v" id="mMs"></div></div>
+          </div>
+          <div class="note" id="epNote"></div>
+          <div class="chart-title">Нийлэлт: давталт бүрийн max|ΔV| (лог шкал), улаан тасархай — θ = 10⁻⁶</div>
+          <div class="card"><svg id="conv" viewBox="0 0 380 230" style="width:100%;display:block"></svg></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const MAPS = ["m05_a","m05_b","m05_c","m10_a","m10_b","m10_c","m20_a","m20_b","m20_c","no_path"];
+const PS = [1.0, 0.9, 0.8, 0.7];
+const ARROW = {U: "↑", D: "↓", L: "←", R: "→"};
+const YLGN = ["#ffffe5","#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d","#238443","#006837","#004529"];
+const NS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+
+const state = { map: "m05_a", p: 0.8, gamma: 0.95, seed: 42, tab: "a", data: null, timer: null };
+const cache = new Map();
+
+// ---------- controls ----------
+for (const m of MAPS) $("map").add(new Option(m, m));
+for (const p of PS) {
+  const b = document.createElement("button");
+  b.textContent = p.toFixed(1); b.dataset.p = p;
+  b.onclick = () => { state.p = p; syncControls(); load(); };
+  $("pseg").appendChild(b);
+}
+$("map").onchange = e => { state.map = e.target.value; load(); };
+$("gamma").oninput = e => { $("gammaVal").textContent = (+e.target.value).toFixed(2); };
+$("gamma").onchange = e => { state.gamma = +(+e.target.value).toFixed(2); load(); };
+$("seed").onchange = e => {
+  const v = Math.max(0, Math.min(1000000, parseInt(e.target.value, 10) || 0));
+  e.target.value = v; state.seed = v; load();
+};
+$("showExp").onchange = () => state.data && drawA(state.data);
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  state.tab = b.dataset.tab;
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("tab-a").hidden = state.tab !== "a";
+  $("tab-v").hidden = state.tab !== "v";
+});
+$("step").oninput = () => { stopPlay(); drawV(state.data); };
+$("play").onclick = () => {
+  if (state.timer) return stopPlay();
+  const s = $("step");
+  if (+s.value >= +s.max) s.value = 0;
+  $("play").textContent = "⏸ Зогсоох";
+  state.timer = setInterval(() => {
+    if (+s.value >= +s.max) return stopPlay();
+    s.value = +s.value + 1; drawV(state.data);
+  }, Math.max(40, 2400 / Math.max(1, +s.max)));
+};
+function stopPlay() {
+  clearInterval(state.timer); state.timer = null;
+  $("play").textContent = "▶ Тоглуулах";
+}
+function syncControls() {
+  $("map").value = state.map;
+  document.querySelectorAll("#pseg button").forEach(b => b.classList.toggle("on", +b.dataset.p === state.p));
+  $("gamma").value = state.gamma; $("gammaVal").textContent = state.gamma.toFixed(2);
+  $("seed").value = state.seed;
+}
+
+// ---------- data ----------
+async function load() {
+  stopPlay();
+  const qs = new URLSearchParams({ map: state.map, p: state.p, gamma: state.gamma, seed: state.seed });
+  const key = qs.toString();
+  document.querySelector("main").classList.add("loading");
+  $("error").hidden = true;
+  try {
+    let data = cache.get(key);
+    if (!data) {
+      const res = await fetch("/api/solve?" + key);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || res.statusText);
+      cache.set(key, body); data = body;
+    }
+    if (key !== new URLSearchParams({ map: state.map, p: state.p, gamma: state.gamma, seed: state.seed }).toString()) return;
+    state.data = data;
+    render(data, true);
+  } catch (e) {
+    $("error").textContent = "Алдаа: " + e.message;
+    $("error").hidden = false;
+  } finally {
+    document.querySelector("main").classList.remove("loading");
+  }
+}
+
+// ---------- svg helpers ----------
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function text(parent, x, y, s, attrs) {
+  const t = el("text", Object.assign({ x, y, "text-anchor": "middle", "dominant-baseline": "central" }, attrs), parent);
+  t.textContent = s; return t;
+}
+function lerpColor(stops, t) {
+  t = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(t)), f = t - i;
+  const a = stops[i].match(/\w\w/g).map(h => parseInt(h, 16));
+  const b = stops[i + 1].match(/\w\w/g).map(h => parseInt(h, 16));
+  return "rgb(" + a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",") + ")";
+}
+function baseGrid(svg, m, fillFor) {
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", `-0.55 -0.55 ${m.width + 0.1} ${m.height + 0.1}`);
+  for (let y = 0; y < m.height; y++)
+    for (let x = 0; x < m.width; x++)
+      el("rect", { x: x - .5, y: y - .5, width: 1, height: 1,
+                   fill: m.grid[y][x] === "#" ? "#5b4636" : fillFor(x, y),
+                   stroke: "#cfcfcf", "stroke-width": .02 }, svg);
+}
+function polyline(svg, pts, color, w, opacity = 1) {
+  if (!pts || pts.length < 2) return;
+  el("polyline", { points: pts.map(p => p.join(",")).join(" "), fill: "none", stroke: color,
+                   "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round",
+                   opacity }, svg);
+}
+function badge(svg, [x, y], label, color) {
+  const r = .36;
+  el("rect", { x: x - r, y: y - r, width: 2 * r, height: 2 * r, rx: .1, fill: color }, svg);
+  text(svg, x, y + .02, label, { fill: "#fff", "font-size": .5, "font-weight": 700 });
+}
+
+// ---------- render ----------
+function render(d, fresh) {
+  const m = d.map;
+  $("caption").textContent = `${m.name}: ${m.width}×${m.height}, чөлөөт нүд ${m.free_cells}, ` +
+    `S=(${m.start}), G=(${m.goal})`;
+  if (fresh) { $("step").max = d.episode.trail.length - 1; $("step").value = d.episode.trail.length - 1; }
+  drawA(d); drawV(d); drawConv(d.vi.deltas);
+  const fmt = v => v === null ? "—" : v;
+  $("cmpBody").innerHTML =
+    `<tr><td>замын өртөг</td><td class="n">${fmt(d.astar.cost)}</td><td class="n">${fmt(d.bfs.cost)}</td></tr>` +
+    `<tr><td>нээсэн орой</td><td class="n">${d.astar.expanded}</td><td class="n">${d.bfs.expanded}</td></tr>` +
+    `<tr><td>хугацаа (мс)</td><td class="n">${d.astar.time_ms.toFixed(3)}</td><td class="n">${d.bfs.time_ms.toFixed(3)}</td></tr>`;
+  $("noPathA").hidden = $("noPathV").hidden = d.astar.path !== null;
+  $("mIter").textContent = d.vi.iterations;
+  $("mV").textContent = d.vi.V_start.toFixed(3);
+  $("mMs").textContent = d.vi.plan_ms.toFixed(1);
+  const ep = d.episode;
+  $("epNote").innerHTML = `Оролдлого (seed ${ep.seed}): <b>${ep.success ? "амжилттай" : "бүтэлгүй"}</b>, ` +
+    `${ep.steps} алхам, нийт шагнал ${ep.return.toFixed(0)}` +
+    (ep.success ? "" : " — 200 алхамд G-д хүрээгүй.");
+}
+
+function drawA(d) {
+  const m = d.map, svg = $("gridA");
+  const exp = new Set($("showExp").checked ? d.astar.expanded_order.map(s => s.join(",")) : []);
+  baseGrid(svg, m, (x, y) => exp.has(x + "," + y) ? "#c9dfee" : "#f7f5ef");
+  polyline(svg, d.astar.path, "#d7301f", Math.max(.08, .3 - m.width / 120));
+  badge(svg, m.start, "S", "#2171b5"); badge(svg, m.goal, "G", "#238b45");
+}
+
+function drawV(d) {
+  if (!d) return;
+  const m = d.map, svg = $("gridV");
+  const V = new Map(d.vi.V.map(([x, y, v]) => [x + "," + y, v]));
+  const vals = [...V.values()], lo = Math.min(...vals), hi = Math.max(...vals);
+  const norm = v => hi > lo ? (v - lo) / (hi - lo) : 0;
+  baseGrid(svg, m, (x, y) => lerpColor(YLGN, norm(V.get(x + "," + y))));
+  for (const [x, y, a] of d.vi.policy) {
+    const dark = norm(V.get(x + "," + y)) > .6;
+    text(svg, x, m.width <= 10 ? y - .08 : y, ARROW[a],
+         { "font-size": m.width <= 10 ? .42 : .55, fill: dark ? "#fff" : "#08306b" });
+  }
+  if (m.width <= 10)
+    for (const [x, y, v] of d.vi.V) {
+      if (x === m.start[0] && y === m.start[1]) continue;
+      text(svg, x, y + .3, v.toFixed(1), { "font-size": .2, fill: norm(v) > .6 ? "#fff" : "#333" });
+    }
+  const k = +$("step").value, trail = d.episode.trail;
+  polyline(svg, trail.slice(0, k + 1), "#6a51a3", .07, .85);
+  badge(svg, m.start, "S", "#2171b5"); badge(svg, m.goal, "G", "#238b45");
+  const r = trail[k];
+  el("circle", { cx: r[0], cy: r[1], r: .28, fill: "#ff7f00", stroke: "#000", "stroke-width": .04 }, svg);
+  $("stepVal").textContent = `${k} / ${trail.length - 1}`;
+}
+
+function drawConv(deltas) {
+  const svg = $("conv"); svg.innerHTML = "";
+  const L = 48, R = 370, T = 10, B = 196;
+  const ys = deltas.map(v => Math.log10(Math.max(v, 1e-12)));
+  const ymax = Math.ceil(Math.max(...ys, 0)), ymin = Math.min(-7, Math.floor(Math.min(...ys.filter(v => v > -12), -6)));
+  const n = deltas.length;
+  const sx = i => L + (n > 1 ? (i / (n - 1)) : 0) * (R - L);
+  const sy = v => T + (ymax - Math.max(v, ymin)) / (ymax - ymin) * (B - T);
+  for (let e = ymin; e <= ymax; e++) {
+    if ((ymax - ymin) > 8 && e % 2) continue;
+    el("line", { x1: L, x2: R, y1: sy(e), y2: sy(e), stroke: "#eee" }, svg);
+    text(svg, L - 6, sy(e), "10" + sup(e), { "text-anchor": "end", "font-size": 10, fill: "#666" });
+  }
+  el("line", { x1: L, x2: R, y1: sy(-6), y2: sy(-6), stroke: "red", "stroke-dasharray": "4 3" }, svg);
+  el("polyline", { points: ys.map((v, i) => `${sx(i)},${sy(v)}`).join(" "), fill: "none",
+                   stroke: "#1f77b4", "stroke-width": 1.6 }, svg);
+  el("line", { x1: L, x2: R, y1: B, y2: B, stroke: "#999" }, svg);
+  el("line", { x1: L, x2: L, y1: T, y2: B, stroke: "#999" }, svg);
+  for (const i of [0, Math.floor((n - 1) / 2), n - 1])
+    text(svg, sx(i), B + 12, String(i + 1), { "font-size": 10, fill: "#666" });
+  text(svg, (L + R) / 2, B + 27, "давталт k", { "font-size": 10, fill: "#666" });
+}
+function sup(n) { return String(n).split("").map(c => "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"["-0123456789".indexOf(c)]).join(""); }
+
+syncControls();
+load();
+</script>
+</body>
+</html>

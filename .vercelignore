@@ -1,0 +1,13 @@
+# Vercel-д зөвхөн вэб хувилбар (public/, api/, warehouse/, maps/) хэрэгтэй.
+# requirements.txt-ийг хасна: streamlit/matplotlib суулгавал функц хэт томорно, API нь стандарт сангаар ажилладаг.
+requirements.txt
+app.py
+experiments.ipynb
+results/
+tests/
+scripts/
+docs/
+.pytest_cache/
+__pycache__/
+warehouse/viz.py
+warehouse/cli.py

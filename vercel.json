@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/solve.py": {
+      "includeFiles": "{warehouse,maps}/**",
+      "maxDuration": 30
+    }
+  }
+}

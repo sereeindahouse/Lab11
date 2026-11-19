@@ -6,11 +6,17 @@ CSEX5064 · Компьютерын ухааны туршилт IV · Б.Сэрг
 **A\*** (тодорхой орчин, p=1) болон **Value Iteration** (магадлалт орчин, p=0.8) аргуудыг
 өөрсдөө хэрэгжүүлж харьцуулна.
 
+## Кодын тайлбар
+
+- [Code guide (English)](docs/CODE_GUIDE.md) — файлуудын үүрэг, A*, BFS, Value Iteration,
+  вэб API, туршилт болон ажиллуулах заавар.
+- [Value Iteration — гар тооцоо](docs/gar_tootsoo.md) — 1×3 коридорын жишээ.
+
 ## Суулгах, ажиллуулах
 
 ```bash
 pip install -r requirements.txt
-python -m pytest                 # 59 тест
+python -m pytest                 # бүх тест
 python scripts/make_maps.py      # maps/*.txt дахин үүсгэх (seed=42)
 python scripts/run_astar.py      # results/astar_results.csv, astar_paths.png
 python scripts/run_vi.py         # results/vi_results.csv, vi_convergence.*, vi_policy_p08.png
@@ -32,10 +38,11 @@ python -m streamlit run app.py   # демо (хөтөч дээр http://localhos
 | `warehouse/astar.py` | A* (Манхэттэн h), BFS тулгалт | XI | Сэргэлэн |
 | `scripts/run_astar.py` | A* хэмжилт → CSV, зураг | XI | Сэргэлэн |
 | `warehouse/viz.py`, `warehouse/cli.py`, `app.py` | Зураг, CLI, Streamlit прототип | XII | Хамт |
+| `public/index.html`, `api/solve.py`, `warehouse/web.py`, `vercel.json` | Вэб интерфэйс, JSON API, Vercel тохиргоо | | |
 | `warehouse/vi.py` | Value Iteration, policy, нэг оролдлого | XIII | Ариунбилэг |
 | `scripts/run_vi.py`, `docs/gar_tootsoo.md` | VI хэмжилт, гар тооцоо | XIII | Ариунбилэг |
 | `experiments.ipynb` | Бүх туршилтыг нэг дор | X–XIII | Хамт |
-| `tests/` | env 16, A* 13, VI 30 тест | X–XIII | |
+| `tests/` | Орчин, A*, VI, вэб API-ийн тест | X–XIII | |
 
 ## Загвар
 
